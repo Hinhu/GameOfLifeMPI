@@ -1,7 +1,9 @@
 import sys
 import random
-from tkinter import Tk, Canvas
 import json
+import os
+from mpi4py import MPI
+from Tkinter import Tk, Canvas
 
 
 def calculateNewMap(map):
@@ -85,39 +87,73 @@ def drawMap(m, w, cellSizeX, cellSizeY):
                                outline="")
 
 
-# ilość generacji do obliczenia
+mpi = MPI.COMM_WORLD
+rank = mpi.Get_rank()
+size = mpi.Get_size()
+
+# ilosc generacji do obliczenia
 n = int(sys.argv[1])
 
-try:
-    mapWidth = int(sys.argv[2])
-except IndexError:
-    mapWidth = 100
+if rank == 0:
 
-try:
-    mapHeight = int(sys.argv[3])
-except IndexError:
-    mapHeight = 100
+    try:
+        mapWidth = int(sys.argv[2])
+    except IndexError:
+        mapWidth = 100
 
-try:
-    map = loadMap(sys.argv[4])
-except IndexError:
-    map = generateRandom(mapWidth, mapHeight)
+    try:
+        mapHeight = int(sys.argv[3])
+    except IndexError:
+        mapHeight = 100
 
-master = Tk()
+    try:
+        map = loadMap(sys.argv[4])
+    except IndexError:
+        map = generateRandom(mapWidth, mapHeight)
 
-canvasWidth = 800
-canvasHeight = 800
-w = Canvas(master,
-           width=canvasWidth,
-           height=canvasHeight)
-w.pack()
+    part = mapHeight/(size-1)
 
-cellSizeX = canvasWidth/len(map)
-cellSizeY = canvasHeight/len(map[0])
+    for i in range(n):
+        for j in range(1, size):
+            if j != 1 and j != size-1:
+                mpi.send(map[(j-1)*part-1:j*part+1], dest=j, tag=n)
+            elif j == 1:
+                mpi.send(map[(j-1)*part:j*part+1], dest=j, tag=n)
+            else:
+                mpi.send(map[(j-1)*part-1:j*part], dest=j, tag=n)
+        for j in range(1, size):
+            m = mpi.recv(source=j, tag=n)
+            if j != 1 and j != size-1:
+                map[(j-1)*part:j*part] = m[1:-1]
+            elif j == 1:
+                map[(j-1)*part:j*part] = m[:-1]
+            else:
+                map[(j-1)*part:j*part] = m[1:]
+        # zapisywanie do pliku, zeby potem moc wyswietlac
+        # bedzie trzeba wylaczyc na potrzeby benchmarku
+        saveMap(map, str(i)+".json")
 
-for i in range(n):
-    map = calculateNewMap(map)
-    drawMap(map, w, cellSizeX, cellSizeY)
-    w.update()
+    # wyswietlanie, tez bedzie trzeba wylaczyc
+    master = Tk()
 
-saveMap(map, "map.json")
+    canvasWidth = 800
+    canvasHeight = 800
+    w = Canvas(master,
+               width=canvasWidth,
+               height=canvasHeight)
+    w.pack()
+
+    cellSizeX = canvasWidth/len(map)
+    cellSizeY = canvasHeight/len(map[0])
+
+    for i in range(n):
+        map = loadMap(str(i)+".json")
+        os.remove(str(i)+".json")
+        drawMap(map, w, cellSizeX, cellSizeY)
+        w.update()
+
+else:
+    for i in range(n):
+        m = mpi.recv(source=0, tag=n)
+        newM = calculateNewMap(m)
+        mpi.send(newM, dest=0, tag=n)
