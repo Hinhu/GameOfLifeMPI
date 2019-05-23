@@ -23,12 +23,15 @@ def calculateNewMap(map):
 
 
 def saveMap(map, name):
+    if not os.path.exists(outputPath):
+        os.makedirs(outputPath)
     f = open(name, "w")
     data = {
         'y': len(map),
         'x': len(map[0]),
         'cells': []
     }
+    print(len(map))
     for x in range(len(map)):
         for y in range(len(map)):
             if map[x][y] == 1:
