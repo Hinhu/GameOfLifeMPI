@@ -90,6 +90,7 @@ def drawMap(m, w, cellSizeX, cellSizeY):
 mpi = MPI.COMM_WORLD
 rank = mpi.Get_rank()
 size = mpi.Get_size()
+outputPath = "output/"
 
 # ilosc generacji do obliczenia
 n = int(sys.argv[1])
@@ -131,7 +132,7 @@ if rank == 0:
                 map[(j-1)*part:j*part] = m[1:]
         # zapisywanie do pliku, zeby potem moc wyswietlac
         # bedzie trzeba wylaczyc na potrzeby benchmarku
-        saveMap(map, str(i)+".json")
+        saveMap(map, outputPath + str(i) + ".json")
 
     # wyswietlanie, tez bedzie trzeba wylaczyc
     master = Tk()
@@ -147,8 +148,8 @@ if rank == 0:
     cellSizeY = canvasHeight/len(map[0])
 
     for i in range(n):
-        map = loadMap(str(i)+".json")
-        os.remove(str(i)+".json")
+        map = loadMap(outputPath + str(i) + ".json")
+        os.remove(outputPath + str(i) + ".json")
         drawMap(map, w, cellSizeX, cellSizeY)
         w.update()
 
