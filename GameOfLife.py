@@ -31,7 +31,6 @@ def saveMap(map, name):
         'x': len(map[0]),
         'cells': []
     }
-    print(len(map))
     for x in range(len(map)):
         for y in range(len(map)):
             if map[x][y] == 1:
@@ -115,27 +114,46 @@ if rank == 0:
     except IndexError:
         map = generateRandom(mapWidth, mapHeight)
 
-    part = mapHeight/(size-1)
+    if size > 2:
+        part = mapHeight/(size-1)
+        r = mapHeight % (size-1)
 
-    for i in range(n):
-        for j in range(1, size):
-            if j != 1 and j != size-1:
-                mpi.send(map[(j-1)*part-1:j*part+1], dest=j, tag=n)
-            elif j == 1:
-                mpi.send(map[(j-1)*part:j*part+1], dest=j, tag=n)
-            else:
-                mpi.send(map[(j-1)*part-1:j*part], dest=j, tag=n)
-        for j in range(1, size):
-            m = mpi.recv(source=j, tag=n)
-            if j != 1 and j != size-1:
-                map[(j-1)*part:j*part] = m[1:-1]
-            elif j == 1:
-                map[(j-1)*part:j*part] = m[:-1]
-            else:
-                map[(j-1)*part:j*part] = m[1:]
-        # zapisywanie do pliku, zeby potem moc wyswietlac
-        # bedzie trzeba wylaczyc na potrzeby benchmarku
-        saveMap(map, outputPath + str(i) + ".json")
+        for i in range(n):
+            for j in range(1, size):
+                p = part
+                if r != 0:
+                    p += 1
+
+                if j != 1 and j != size-1:
+                    mpi.send(map[(j-1)*p-1:j*p+1], dest=j, tag=n)
+                elif j == 1:
+                    mpi.send(map[0:p+1], dest=j, tag=n)
+                else:
+                    mpi.send(map[(j-1)*p-1:j*p], dest=j, tag=n)
+                r -= 1
+            for j in range(1, size):
+                p = part
+                if r != 0:
+                    p += 1
+
+                m = mpi.recv(source=j, tag=n)
+                if j != 1 and j != size-1:
+                    map[(j-1)*p:j*p] = m[1:-1]
+                elif j == 1:
+                    map[0:p] = m[:-1]
+                else:
+                    map[(j-1)*p:] = m[1:]
+                r -= 1
+            # zapisywanie do pliku, zeby potem moc wyswietlac
+            # bedzie trzeba wylaczyc na potrzeby benchmarku
+            saveMap(map, outputPath + str(i) + ".json")
+    else:  # jednowatkowo
+        for i in range(n):
+            newMap = calculateNewMap(map)
+            # zapisywanie do pliku, zeby potem moc wyswietlac
+            # bedzie trzeba wylaczyc na potrzeby benchmarku
+            saveMap(newMap, outputPath + str(i) + ".json")
+            map = newMap
 
     # wyswietlanie, tez bedzie trzeba wylaczyc
     master = Tk()
@@ -157,6 +175,8 @@ if rank == 0:
         w.update()
 
 else:
+    if size == 2:  # jeśli uzytkownik poprosi o 2 procesy, to wszystko policzy glowny, ten moze skonczyc prace
+        exit()
     for i in range(n):
         m = mpi.recv(source=0, tag=n)
         newM = calculateNewMap(m)
