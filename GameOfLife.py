@@ -32,7 +32,7 @@ def saveMap(map, name):
         'cells': []
     }
     for x in range(len(map)):
-        for y in range(len(map)):
+        for y in range(len(map[0])):
             if map[x][y] == 1:
                 data['cells'].append([x, y])
     f.write(json.dumps(data))
@@ -145,9 +145,9 @@ if rank == 0:
                     slices.append([0, p])
                     past = p+1
                 else:
-                    mpi.send(map[past-2:past+p-1], dest=j, tag=n)
-                    print([past-2, past+p-1])
-                    slices.append([past-1, past+p])
+                    mpi.send(map[past-2:], dest=j, tag=n)
+                    print([past-2, len(map)])
+                    slices.append([past-1, len(map)])
                 r -= 1
             print("RECV")
             for j in range(1, size):
