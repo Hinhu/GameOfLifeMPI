@@ -1,10 +1,10 @@
-import sys
 import random
 import json
 import os
 import argparse
 from mpi4py import MPI
-from tkinter import Tk, Canvas
+from Tkinter import Tk, Canvas
+
 
 def calculateNewMap(map):
     newMap = zeros(len(map[0]), len(map))
@@ -88,19 +88,21 @@ def drawMap(m, w, cellSizeX, cellSizeY):
                                x+cellSizeX, cellSizeY*y+cellSizeY, fill=f,
                                outline="")
 
+
 def parseArgs():
     parser = argparse.ArgumentParser(description='Game of Life MPI')
-    parser.add_argument('-g', '--generations', help='number of generations', type=int, default=100)
-    parser.add_argument('-b', '--benchmark', help='benchmark mode (no gui, no filesave)', action='store_true')
+    parser.add_argument('-g', '--generations',
+                        help='number of generations', type=int, default=100)
+    parser.add_argument(
+        '-b', '--benchmark', help='benchmark mode (no gui, no filesave)', action='store_true')
     parser.add_argument('--height', help='map height', type=int, default=100)
     parser.add_argument('--width', help='map width', type=int, default=100)
     parser.add_argument('--mapfile', help='input map file')
-    parser.add_argument('--savelast', help='input map file', action='store_true')
+    parser.add_argument('--savelast', help='input map file',
+                        action='store_true')
     return parser.parse_args()
 
 
-benchmark = False
-saveLast = False
 map = []
 args = parseArgs()
 n = args.generations
@@ -126,30 +128,45 @@ if rank == 0:
         r = mapHeight % (size-1)
 
         for i in range(n):
+            slices = []
             for j in range(1, size):
                 p = part
-                if r != 0:
+                if r > 0:
                     p += 1
-
+                print({'part': p})
                 if j != 1 and j != size-1:
-                    mpi.send(map[(j-1)*p-1:j*p+1], dest=j, tag=n)
+                    mpi.send(map[past-2:past+p], dest=j, tag=n)
+                    print([past-2, past+p])
+                    slices.append([past-1, past+p-1])
+                    past += p
                 elif j == 1:
                     mpi.send(map[0:p+1], dest=j, tag=n)
+                    print([0, p+1])
+                    slices.append([0, p])
+                    past = p+1
                 else:
-                    mpi.send(map[(j-1)*p-1:j*p], dest=j, tag=n)
+                    mpi.send(map[past-2:past+p-1], dest=j, tag=n)
+                    print([past-2, past+p-1])
+                    slices.append([past-1, past+p])
                 r -= 1
+            print("RECV")
             for j in range(1, size):
                 p = part
-                if r != 0:
+                if r > 0:
                     p += 1
 
                 m = mpi.recv(source=j, tag=n)
                 if j != 1 and j != size-1:
-                    map[(j-1)*p:j*p] = m[1:-1]
+                    print([len(map[slices[j-1][0]:slices[j-1][1]]), len(m[1:-1])])
+                    map[slices[j-1][0]:slices[j-1][1]] = m[1:-1]
                 elif j == 1:
-                    map[0:p] = m[:-1]
+                    print([len(map[slices[j-1][0]:slices[j-1][1]]), len(m[:-1])])
+                    map[slices[j-1][0]:slices[j-1][1]] = m[:-1]
+                    past = p
                 else:
-                    map[(j-1)*p:] = m[1:]
+                    print([len(map[slices[j-1][0]:slices[j-1][1]]), len(m[1:])])
+                    map[slices[j-1][0]:slices[j-1][1]] = m[1:]
+
                 r -= 1
             # zapisywanie do pliku, zeby potem moc wyswietlac
             # bedzie trzeba wylaczyc na potrzeby benchmarku
@@ -186,7 +203,7 @@ if rank == 0:
             w.update()
 
 else:
-    if size == 2:  # jeśli uzytkownik poprosi o 2 procesy, to wszystko policzy glowny, ten moze skonczyc prace
+    if size == 2:  # jesli uzytkownik poprosi o 2 procesy, to wszystko policzy glowny, ten moze skonczyc prace
         exit()
     for i in range(n):
         m = mpi.recv(source=0, tag=n)
