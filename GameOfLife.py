@@ -115,7 +115,7 @@ if rank == 0:
         map = generateRandom(mapWidth, mapHeight)
 
     if size > 2:
-        part = mapHeight/(size-1)
+        part = mapHeight//(size-1)
         r = mapHeight % (size-1)
 
         for i in range(n):
