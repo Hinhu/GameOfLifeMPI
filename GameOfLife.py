@@ -45,7 +45,7 @@ def loadMap(filename):
     map = zeros(data['x'], data['y'])
     for cell in cells:
         map[cell[0]][cell[1]] = 1
-    return map
+    return map, data['x'], data['y']
 
 
 def generateRandom(x, y):
@@ -88,29 +88,37 @@ def drawMap(m, w, cellSizeX, cellSizeY):
                                x+cellSizeX, cellSizeY*y+cellSizeY, fill=f,
                                outline="")
 
+def parseArgs():
+    parser = argparse.ArgumentParser(description='Game of Life MPI')
+    parser.add_argument('-g', '--generations', help='number of generations', type=int, default=100)
+    parser.add_argument('-b', '--benchmark', help='benchmark mode (no gui, no filesave)', action='store_true')
+    parser.add_argument('--height', help='map height', type=int, default=100)
+    parser.add_argument('--width', help='map width', type=int, default=100)
+    parser.add_argument('--mapfile', help='input map file')
+    parser.add_argument('--savelast', help='input map file', action='store_true')
+    return parser.parse_args()
+
 
 benchmark = False
+saveLast = False
 map = []
-
-parser = argparse.ArgumentParser(description='Game of Life MPI')
-parser.add_argument('-g', '--generations', help='number of generations', type=int, default=100)
-parser.add_argument('-b', '--benchmark', help='benchmark mode (no gui, no filesave)', action='store_true')
-parser.add_argument('--height', help='map height', type=int, default=100)
-parser.add_argument('--width', help='map width', type=int, default=100)
-parser.add_argument('--mapfile', help='input map file')
-args = parser.parse_args()
+args = parseArgs()
 n = args.generations
 mapWidth = args.width
 mapHeight = args.height
-map = loadMap(args.mapfile) if args.mapfile else generateRandom(mapWidth, mapHeight)
+if args.mapfile:
+    map, mapWidth, mapHeight = loadMap(args.mapfile)
+else:
+    map = generateRandom(mapWidth, mapHeight)
 benchmark = args.benchmark
+saveLast = args.savelast
 
 mpi = MPI.COMM_WORLD
 rank = mpi.Get_rank()
 size = mpi.Get_size()
 outputPath = "output/"
 
-# print("N:{} H:{} W:{} ".format(n, mapHeight, mapWidth))
+# print("N:{} G:{} mH:{} mW:{} ".format(size, n, mapHeight, mapWidth))
 
 if rank == 0:
     if size > 2:
@@ -145,6 +153,8 @@ if rank == 0:
                 r -= 1
             # zapisywanie do pliku, zeby potem moc wyswietlac
             # bedzie trzeba wylaczyc na potrzeby benchmarku
+            if saveLast and i == (n-1):
+                saveMap(map, outputPath + str(size) + "last.json")
             if not benchmark:
                 saveMap(map, outputPath + str(i) + ".json")
     else:  # jednowatkowo
@@ -152,6 +162,8 @@ if rank == 0:
             newMap = calculateNewMap(map)
             # zapisywanie do pliku, zeby potem moc wyswietlac
             # bedzie trzeba wylaczyc na potrzeby benchmarku
+            if saveLast and i == (n - 1):
+                saveMap(map, outputPath + str(size) + "last.json")
             if not benchmark:
                 saveMap(newMap, outputPath + str(i) + ".json")
             map = newMap
@@ -168,7 +180,7 @@ if rank == 0:
         cellSizeY = canvasHeight/len(map[0])
 
         for i in range(n):
-            map = loadMap(outputPath + str(i) + ".json")
+            map, _, _ = loadMap(outputPath + str(i) + ".json")
             os.remove(outputPath + str(i) + ".json")
             drawMap(map, w, cellSizeX, cellSizeY)
             w.update()
