@@ -2,9 +2,9 @@ import sys
 import random
 import json
 import os
+import argparse
 from mpi4py import MPI
-from Tkinter import Tk, Canvas
-
+from tkinter import Tk, Canvas
 
 def calculateNewMap(map):
     newMap = zeros(len(map[0]), len(map))
@@ -89,31 +89,30 @@ def drawMap(m, w, cellSizeX, cellSizeY):
                                outline="")
 
 
+benchmark = False
+map = []
+
+parser = argparse.ArgumentParser(description='Game of Life MPI')
+parser.add_argument('-g', '--generations', help='number of generations', type=int, default=100)
+parser.add_argument('-b', '--benchmark', help='benchmark mode (no gui, no filesave)', action='store_true')
+parser.add_argument('--height', help='map height', type=int, default=100)
+parser.add_argument('--width', help='map width', type=int, default=100)
+parser.add_argument('--mapfile', help='input map file')
+args = parser.parse_args()
+n = args.generations
+mapWidth = args.width
+mapHeight = args.height
+map = loadMap(args.mapfile) if args.mapfile else generateRandom(mapWidth, mapHeight)
+benchmark = args.benchmark
+
 mpi = MPI.COMM_WORLD
 rank = mpi.Get_rank()
 size = mpi.Get_size()
 outputPath = "output/"
 
-# ilosc generacji do obliczenia
-n = int(sys.argv[1])
+# print("N:{} H:{} W:{} ".format(n, mapHeight, mapWidth))
 
 if rank == 0:
-
-    try:
-        mapWidth = int(sys.argv[2])
-    except IndexError:
-        mapWidth = 100
-
-    try:
-        mapHeight = int(sys.argv[3])
-    except IndexError:
-        mapHeight = 100
-
-    try:
-        map = loadMap(sys.argv[4])
-    except IndexError:
-        map = generateRandom(mapWidth, mapHeight)
-
     if size > 2:
         part = mapHeight//(size-1)
         r = mapHeight % (size-1)
@@ -146,33 +145,33 @@ if rank == 0:
                 r -= 1
             # zapisywanie do pliku, zeby potem moc wyswietlac
             # bedzie trzeba wylaczyc na potrzeby benchmarku
-            saveMap(map, outputPath + str(i) + ".json")
+            if not benchmark:
+                saveMap(map, outputPath + str(i) + ".json")
     else:  # jednowatkowo
         for i in range(n):
             newMap = calculateNewMap(map)
             # zapisywanie do pliku, zeby potem moc wyswietlac
             # bedzie trzeba wylaczyc na potrzeby benchmarku
-            saveMap(newMap, outputPath + str(i) + ".json")
+            if not benchmark:
+                saveMap(newMap, outputPath + str(i) + ".json")
             map = newMap
 
-    # wyswietlanie, tez bedzie trzeba wylaczyc
-    master = Tk()
+    if not benchmark:
+        master = Tk()
+        canvasWidth = 800
+        canvasHeight = 800
 
-    canvasWidth = 800
-    canvasHeight = 800
-    w = Canvas(master,
-               width=canvasWidth,
-               height=canvasHeight)
-    w.pack()
+        w = Canvas(master, width=canvasWidth, height=canvasHeight)
+        w.pack()
 
-    cellSizeX = canvasWidth/len(map)
-    cellSizeY = canvasHeight/len(map[0])
+        cellSizeX = canvasWidth/len(map)
+        cellSizeY = canvasHeight/len(map[0])
 
-    for i in range(n):
-        map = loadMap(outputPath + str(i) + ".json")
-        os.remove(outputPath + str(i) + ".json")
-        drawMap(map, w, cellSizeX, cellSizeY)
-        w.update()
+        for i in range(n):
+            map = loadMap(outputPath + str(i) + ".json")
+            os.remove(outputPath + str(i) + ".json")
+            drawMap(map, w, cellSizeX, cellSizeY)
+            w.update()
 
 else:
     if size == 2:  # jeśli uzytkownik poprosi o 2 procesy, to wszystko policzy glowny, ten moze skonczyc prace
