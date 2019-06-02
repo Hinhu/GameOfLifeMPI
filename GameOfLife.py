@@ -133,23 +133,18 @@ if rank == 0:
                 p = part
                 if r > 0:
                     p += 1
-                print({'part': p})
                 if j != 1 and j != size-1:
                     mpi.send(map[past-2:past+p], dest=j, tag=n)
-                    print([past-2, past+p])
                     slices.append([past-1, past+p-1])
                     past += p
                 elif j == 1:
                     mpi.send(map[0:p+1], dest=j, tag=n)
-                    print([0, p+1])
                     slices.append([0, p])
                     past = p+1
                 else:
                     mpi.send(map[past-2:], dest=j, tag=n)
-                    print([past-2, len(map)])
                     slices.append([past-1, len(map)])
                 r -= 1
-            print("RECV")
             for j in range(1, size):
                 p = part
                 if r > 0:
@@ -157,14 +152,11 @@ if rank == 0:
 
                 m = mpi.recv(source=j, tag=n)
                 if j != 1 and j != size-1:
-                    print([len(map[slices[j-1][0]:slices[j-1][1]]), len(m[1:-1])])
                     map[slices[j-1][0]:slices[j-1][1]] = m[1:-1]
                 elif j == 1:
-                    print([len(map[slices[j-1][0]:slices[j-1][1]]), len(m[:-1])])
                     map[slices[j-1][0]:slices[j-1][1]] = m[:-1]
                     past = p
                 else:
-                    print([len(map[slices[j-1][0]:slices[j-1][1]]), len(m[1:])])
                     map[slices[j-1][0]:slices[j-1][1]] = m[1:]
 
                 r -= 1
