@@ -3,7 +3,7 @@ import json
 import os
 import argparse
 from mpi4py import MPI
-from Tkinter import Tk, Canvas
+from tkinter import Tk, Canvas
 
 
 def calculateNewMap(map):
@@ -77,15 +77,15 @@ def countNeighbours(m, x, y):
     return count
 
 
-def drawMap(m, w, cellSizeX, cellSizeY):
-    for x in range(len(m)):
-        for y in range(len(m[0])):
-            if m[x][y] == 1:
+def drawMap(m, w, cellSize):
+    for x in range(len(m[0])):
+        for y in range(len(m)):
+            if m[y][x] == 1:
                 f = "#000000"
             else:
                 f = "#ffffff"
-            w.create_rectangle(cellSizeX*x, cellSizeY*y, cellSizeX *
-                               x+cellSizeX, cellSizeY*y+cellSizeY, fill=f,
+            w.create_rectangle(cellSize*x, cellSize*y, cellSize *
+                               x+cellSize, cellSize*y+cellSize, fill=f,
                                outline="")
 
 
@@ -185,13 +185,12 @@ if rank == 0:
         w = Canvas(master, width=canvasWidth, height=canvasHeight)
         w.pack()
 
-        cellSizeX = canvasWidth/len(map)
-        cellSizeY = canvasHeight/len(map[0])
+        cellSize = canvasWidth/len(map) if len(map) > len(map[0]) else (canvasWidth/len(map[0]))
 
         for i in range(n):
             map, _, _ = loadMap(outputPath + str(i) + ".json")
             os.remove(outputPath + str(i) + ".json")
-            drawMap(map, w, cellSizeX, cellSizeY)
+            drawMap(map, w, cellSize)
             w.update()
 
 else:
