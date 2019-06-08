@@ -1,106 +1,10 @@
-import random
-import json
 import os
-import argparse
 from mpi4py import MPI
-from tkinter import Tk, Canvas
-
-
-def calculateNewMap(map):
-    newMap = zeros(len(map[0]), len(map))
-    for x in range(len(newMap)):
-        for y in range(len(newMap[0])):
-            count = countNeighbours(map, x, y)
-            if map[x][y] == 1:
-                if count < 2 or count > 3:
-                    newMap[x][y] = 0
-                else:
-                    newMap[x][y] = 1
-            else:
-                if count == 3:
-                    newMap[x][y] = 1
-    return newMap
-
-
-def saveMap(map, name):
-    if not os.path.exists(outputPath):
-        os.makedirs(outputPath)
-    f = open(name, "w")
-    data = {
-        'y': len(map),
-        'x': len(map[0]),
-        'cells': []
-    }
-    for x in range(len(map)):
-        for y in range(len(map[0])):
-            if map[x][y] == 1:
-                data['cells'].append([x, y])
-    f.write(json.dumps(data))
-
-
-def loadMap(filename):
-    f = open(filename)
-    data = json.loads(f.read())
-    cells = data['cells']
-    map = zeros(data['x'], data['y'])
-    for cell in cells:
-        map[cell[0]][cell[1]] = 1
-    return map, data['x'], data['y']
-
-
-def generateRandom(x, y):
-    return [[random.randint(0, 1) for i in range(x)] for j in range(y)]
-
-
-def zeros(x, y):
-    return [[0 for i in range(x)] for j in range(y)]
-
-
-def countNeighbours(m, x, y):
-    count = 0
-    if x > 0:
-        count += m[x - 1][y]
-    if len(m) > x + 1:
-        count += m[x + 1][y]
-    if y > 0:
-        count += m[x][y - 1]
-    if len(m[0]) > y + 1:
-        count += m[x][y + 1]
-    if x > 0 and y > 0:
-        count += m[x - 1][y - 1]
-    if x > 0 and len(m[0]) > y + 1:
-        count += m[x - 1][y + 1]
-    if len(m) > x + 1 and len(m[0]) > y + 1:
-        count += m[x + 1][y + 1]
-    if y > 0 and len(m) > x + 1:
-        count += m[x + 1][y - 1]
-    return count
-
-
-def drawMap(m, w, cellSize):
-    for x in range(len(m[0])):
-        for y in range(len(m)):
-            if m[y][x] == 1:
-                f = "#000000"
-            else:
-                f = "#ffffff"
-            w.create_rectangle(cellSize*x, cellSize*y, cellSize *
-                               x+cellSize, cellSize*y+cellSize, fill=f,
-                               outline="")
-
-
-def parseArgs():
-    parser = argparse.ArgumentParser(description='Game of Life MPI')
-    parser.add_argument('-g', '--generations',
-                        help='number of generations', type=int, default=100)
-    parser.add_argument(
-        '-b', '--benchmark', help='benchmark mode (no gui, no filesave)', action='store_true')
-    parser.add_argument('--height', help='map height', type=int, default=100)
-    parser.add_argument('--width', help='map width', type=int, default=100)
-    parser.add_argument('--mapfile', help='input map file')
-    parser.add_argument('--savelast', help='input map file',
-                        action='store_true')
-    return parser.parse_args()
+from parser import parseArgs
+from fileHandlers import loadMap, saveMap
+from matrix import zeros, generateRandom
+from renderer import render
+from cellCalculators import calculateNewMap, countNeighbours
 
 
 map = []
@@ -118,9 +22,11 @@ saveLast = args.savelast
 mpi = MPI.COMM_WORLD
 rank = mpi.Get_rank()
 size = mpi.Get_size()
-outputPath = "output/"
 
-# print("N:{} G:{} mH:{} mW:{} ".format(size, n, mapHeight, mapWidth))
+outputPath = "output/"
+if not os.path.exists(outputPath):
+    os.makedirs(outputPath)
+
 
 if rank == 0:
     if size > 2:
@@ -133,17 +39,19 @@ if rank == 0:
                 p = part
                 if r > 0:
                     p += 1
-                if j != 1 and j != size-1:
-                    mpi.send(map[past-2:past+p], dest=j, tag=n)
-                    slices.append([past-1, past+p-1])
-                    past += p
-                elif j == 1:
+
+                if j == 1:
                     mpi.send(map[0:p+1], dest=j, tag=n)
                     slices.append([0, p])
                     past = p+1
+                elif j != 1 and j != size-1:
+                    mpi.send(map[past-2:past+p], dest=j, tag=n)
+                    slices.append([past-1, past+p-1])
+                    past += p
                 else:
                     mpi.send(map[past-2:], dest=j, tag=n)
                     slices.append([past-1, len(map)])
+
                 r -= 1
             for j in range(1, size):
                 p = part
@@ -151,11 +59,12 @@ if rank == 0:
                     p += 1
 
                 m = mpi.recv(source=j, tag=n)
-                if j != 1 and j != size-1:
-                    map[slices[j-1][0]:slices[j-1][1]] = m[1:-1]
-                elif j == 1:
+
+                if j == 1:
                     map[slices[j-1][0]:slices[j-1][1]] = m[:-1]
                     past = p
+                elif j != 1 and j != size-1:
+                    map[slices[j-1][0]:slices[j-1][1]] = m[1:-1]
                 else:
                     map[slices[j-1][0]:slices[j-1][1]] = m[1:]
 
@@ -178,20 +87,7 @@ if rank == 0:
             map = newMap
 
     if not benchmark:
-        master = Tk()
-        canvasWidth = 800
-        canvasHeight = 800
-
-        w = Canvas(master, width=canvasWidth, height=canvasHeight)
-        w.pack()
-
-        cellSize = canvasWidth/len(map) if len(map) > len(map[0]) else (canvasWidth/len(map[0]))
-
-        for i in range(n):
-            map, _, _ = loadMap(outputPath + str(i) + ".json")
-            os.remove(outputPath + str(i) + ".json")
-            drawMap(map, w, cellSize)
-            w.update()
+        render(len(map), len(map[0]), n, outputPath)
 
 else:
     if size == 2:  # jesli uzytkownik poprosi o 2 procesy, to wszystko policzy glowny, ten moze skonczyc prace
