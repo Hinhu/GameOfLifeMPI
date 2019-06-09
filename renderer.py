@@ -17,6 +17,7 @@ def drawMap(m, w, cellSize):
 
 def render(width, height, n, outputPath):
     master = Tk()
+    master.title("Game of Life MPI")
     canvasWidth = 800
     canvasHeight = 800
 
