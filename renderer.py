@@ -1,5 +1,5 @@
 import os
-from Tkinter import Tk, Canvas
+from tkinter import Tk, Canvas
 from fileHandlers import loadMap
 
 
@@ -10,8 +10,8 @@ def drawMap(m, w, cellSize):
                 f = "#000000"
             else:
                 f = "#ffffff"
-            w.create_rectangle(cellSize*x, cellSize*y, cellSize *
-                               x+cellSize, cellSize*y+cellSize, fill=f,
+            w.create_rectangle(cellSize * x, cellSize * y, cellSize *
+                               x + cellSize, cellSize * y + cellSize, fill=f,
                                outline="")
 
 
@@ -23,8 +23,7 @@ def render(width, height, n, outputPath):
     w = Canvas(master, width=canvasWidth, height=canvasHeight)
     w.pack()
 
-    cellSize = canvasWidth / \
-        width if width > height else (canvasWidth/height)
+    cellSize = canvasWidth / width if width > height else (canvasWidth / height)
 
     for i in range(n):
         map, _, _ = loadMap(outputPath + str(i) + ".json")
