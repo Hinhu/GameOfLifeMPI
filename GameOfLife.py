@@ -78,13 +78,14 @@ if rank == 0:
     else:  # jednowatkowo
         for i in range(n):
             newMap = calculateNewMap(map)
+            map = newMap
             # zapisywanie do pliku, zeby potem moc wyswietlac
             # bedzie trzeba wylaczyc na potrzeby benchmarku
             if saveLast and i == (n - 1):
                 saveMap(map, outputPath + str(size) + "last.json")
             if not benchmark:
                 saveMap(newMap, outputPath + str(i) + ".json")
-            map = newMap
+
 
     if not benchmark:
         render(len(map), len(map[0]), n, outputPath)
